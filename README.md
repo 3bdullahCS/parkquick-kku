@@ -221,8 +221,3 @@ curl -X POST https://YOUR_API/zones/report \
 
 - GitHub: [@3bdullahCS](https://github.com/3bdullahCS)
 
----
-
-## 📄 License
-
-This project is a graduation project (مشروع تخرج) at King Khalid University.
