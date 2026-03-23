@@ -98,7 +98,7 @@ export default function ParkingMap({ allReports, onReport, lastReportTime, theme
       </div>
 
       <div className="pk-map-wrap">
-        <MapContainer center={center} zoom={18} maxZoom={20} minZoom={17} zoomControl={false} attributionControl={false} style={{ width: "100%", height: "100%" }}>
+        <MapContainer center={center} zoom={18} maxZoom={20} minZoom={18} zoomControl={false} attributionControl={false} style={{ width: "100%", height: "100%" }}>
           <TileLayer url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}" maxZoom={21} subdomains={["mt0","mt1","mt2","mt3"]} />
           <TileLayer url="https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}" maxZoom={21} opacity={0.5} />
           <FlyTo center={center} zoom={18} />
