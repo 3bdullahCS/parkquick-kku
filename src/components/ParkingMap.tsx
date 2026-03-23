@@ -92,7 +92,7 @@ export default function ParkingMap({ allReports, onReport, lastReportTime, theme
       </div>
 
       <div className="pk-legend">
-        {[{ c: "var(--green)", l: "متاح" }, { c: "var(--orange)", l: "متوسط" }, { c: "var(--red)", l: "ممتلئ" }, { c: "var(--muted)", l: "لا بيانات" }].map(i => (
+        {[{ c: "var(--green)", l: "متاح" }, { c: "var(--orange)", l: "متوسط" }, { c: "var(--red)", l: "ممتلئ" }].map(i => (
           <span className="pk-chip" key={i.l}><span className="pk-dot" style={{ background: i.c }} />{i.l}</span>
         ))}
       </div>
