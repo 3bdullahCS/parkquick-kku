@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ParkQuick KKU - Serverless parking backend
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [prod, dev]
+
+Resources:
+  ReportsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub parkquick-reports-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: zoneId
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: N
+        - AttributeName: visitorId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: zoneId
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: visitorId-index
+          KeySchema:
+            - AttributeName: visitorId
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: KEYS_ONLY
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub parkquick-lambda-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:PutItem
+                Resource:
+                  - !GetAtt ReportsTable.Arn
+                  - !Sub "${ReportsTable.Arn}/index/*"
+
+  GetZoneStatusFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub parkquick-getZoneStatus-${Environment}
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Architectures: [arm64]
+      Code:
+        ZipFile: |
+          export const handler = async () => ({ statusCode: 200, body: '{}' });
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ReportsTable
+      Timeout: 10
+      MemorySize: 256
+
+  SubmitReportFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub parkquick-submitReport-${Environment}
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Architectures: [arm64]
+      Code:
+        ZipFile: |
+          export const handler = async () => ({ statusCode: 200, body: '{}' });
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ReportsTable
+      Timeout: 10
+      MemorySize: 256
+
+  GetBestZoneFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub parkquick-getBestZone-${Environment}
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Architectures: [arm64]
+      Code:
+        ZipFile: |
+          export const handler = async () => ({ statusCode: 200, body: '{}' });
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ReportsTable
+      Timeout: 10
+      MemorySize: 256
+
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub parkquick-api-${Environment}
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins: ["*"]
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: [Content-Type]
+        MaxAge: 86400
+
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 100
+        ThrottlingRateLimit: 50
+
+  GetZoneStatusIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt GetZoneStatusFunction.Arn
+      PayloadFormatVersion: "2.0"
+
+  GetZoneStatusRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: "GET /zones/status"
+      Target: !Sub "integrations/${GetZoneStatusIntegration}"
+
+  GetZoneStatusPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GetZoneStatusFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*"
+
+  SubmitReportIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt SubmitReportFunction.Arn
+      PayloadFormatVersion: "2.0"
+
+  SubmitReportRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: "POST /zones/report"
+      Target: !Sub "integrations/${SubmitReportIntegration}"
+
+  SubmitReportPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref SubmitReportFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*"
+
+  GetBestZoneIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt GetBestZoneFunction.Arn
+      PayloadFormatVersion: "2.0"
+
+  GetBestZoneRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: "GET /zones/best"
+      Target: !Sub "integrations/${GetBestZoneIntegration}"
+
+  GetBestZonePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GetBestZoneFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*"
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !GetAtt HttpApi.ApiEndpoint
+  TableName:
+    Description: DynamoDB table name
+    Value: !Ref ReportsTable
